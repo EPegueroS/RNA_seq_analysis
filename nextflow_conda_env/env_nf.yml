@@ -1,0 +1,8 @@
+name: env_nf
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - nextflow=23.04
+  - nf-core=2.10

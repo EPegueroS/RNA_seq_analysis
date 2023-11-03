@@ -54,3 +54,5 @@ rsconnect/
 .nextflow*
 inputs
 work
+out_mapping
+*.gz

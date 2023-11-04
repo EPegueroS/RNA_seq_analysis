@@ -1,0 +1,74 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(fgsea)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(ReactomePA)
+```
+
+
+```{r}
+res_table <- data.frame(res)
+res_table$gene_id <- rownames(res_table)
+
+res_table <- unique(merge(res_table, tx2gene[c(2,3)], by.x = "gene_id", by.y = "V2"))
+
+res_table <- res_table[order(-res_table$log2FoldChange), ]
+```
+
+```{r}
+id.df <- bitr(res_table$gene_id, fromType = "ENSEMBL",
+        toType = c("ENTREZID", "SYMBOL"),
+        OrgDb = org.Hs.eg.db)
+```
+
+```{r}
+res_table_extra_ids <- merge(res_table, id.df, by.x = "gene_id", by.y = "ENSEMBL", all.x = TRUE)
+
+res_table_extra_ids <- res_table_extra_ids[order(-res_table_extra_ids$log2FoldChange), ]
+```
+
+
+
+```{r}
+ego2 <- enrichGO(gene         = res_table$gene_id[1:50],
+                OrgDb         = org.Hs.eg.db,
+                keyType       = 'ENSEMBL',
+                ont           = "BP",
+                pAdjustMethod = "BH",
+                pvalueCutoff  = 0.1,
+                qvalueCutoff  = 0.5, universe = res_table$gene_id)
+```
+
+```{r}
+barplot(ego2, drop=TRUE, showCategory=8)
+```
+
+
+
+```{r}
+kegg2 <- enrichKEGG(gene         = res_table$gene_id[1:50],
+                OrgDb         = org.Hs.eg.db,
+                keyType       = 'ENSEMBL',
+                ont           = "BP",
+                pAdjustMethod = "BH",
+                pvalueCutoff  = 0.1,
+                qvalueCutoff  = 0.5, universe = res_table$gene_id)
+```
+
+```{r}
+entrez_gene_list <- res_table_extra_ids$log2FoldChange
+names(entrez_gene_list) <- res_table_extra_ids$ENTREZID
+y <- gsePathway(entrez_gene_list, 
+                pvalueCutoff = 0.2,
+                pAdjustMethod = "BH", 
+                verbose = FALSE)
+
+head(y)
+```
+
+

@@ -1,0 +1,159 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tximport)
+library(DESeq2)
+library(ggplot2)
+```
+
+```{r}
+in_dir <- "../../pipelines/out_mapping"
+```
+
+
+```{r}
+metadata <-
+  lapply(list.files(
+    "../../pipelines/inputs/fastqfiles/metadata/",
+    pattern = "tsv",
+    full.names = TRUE
+  ), function(fl) {
+    read.delim(fl)
+  })
+metadata <- do.call(rbind, metadata)
+```
+
+```{r}
+sample_files <-
+  file.path(in_dir,
+            "star_salmon",
+            metadata$experiment_accession,
+            "quant.sf")
+names(sample_files) <- metadata$sample_title
+all(file.exists(sample_files))
+```
+
+```{r}
+tx2gene <-
+  read.delim(file.path(in_dir, "star_salmon" , "salmon_tx2gene.tsv"),
+             header = FALSE)
+```
+
+```{r}
+txi <- tximport(sample_files, type = "salmon", tx2gene = tx2gene)
+names(txi)
+```
+
+```{r}
+head(txi$counts)
+```
+
+```{r}
+sample_table <-
+  data.frame(
+    condition = factor(stringr::str_split_i(colnames(txi$counts), "_", 1)),
+    subject = factor(stringr::str_split_i(colnames(txi$counts), "_", 3))
+  )
+rownames(sample_table) <- colnames(txi$counts)
+sample_table
+```
+```{r}
+dds <- DESeqDataSetFromTximport(txi, sample_table, ~subject + condition)
+smallestGroupSize <- 3
+keep <- rowSums(counts(dds) >= 10) >= smallestGroupSize
+dds <- dds[keep,]
+
+dds <- DESeq(dds)
+resultsNames(dds) # lists the coefficients
+res <- results(dds)
+res
+res <- results(dds, name="condition_G03_vs_G02")
+res
+```
+
+```{r}
+resultsNames(dds)
+
+```
+
+```{r}
+resLFC <- lfcShrink(dds, coef="condition_G03_vs_G02", type="apeglm")
+resLFC
+```
+
+```{r}
+plotMA(res, ylim=c(-2,2))
+```
+```{r}
+plotMA(resLFC, ylim=c(-2,2))
+
+```
+
+
+```{r}
+plotCounts(dds, gene="ENSG00000049768", intgroup="condition")
+```
+
+```{r}
+# this gives log2(n + 1)
+ntd <- normTransform(dds)
+library("vsn")
+meanSdPlot(assay(ntd))
+```
+
+
+```{r}
+vsd <- vst(dds, blind=FALSE)
+rld <- rlog(dds, blind=FALSE)
+head(assay(vsd), 3)
+```
+
+
+```{r}
+meanSdPlot(assay(vsd))
+
+```
+
+```{r}
+# this gives log2(n + 1)
+ntd <- normTransform(dds)
+library("vsn")
+meanSdPlot(assay(ntd))
+```
+
+
+
+```{r}
+library("pheatmap")
+select <- order(rowMeans(counts(dds,normalized=TRUE)),
+                decreasing=TRUE)[1:150]
+df <- as.data.frame(colData(dds)[,c("condition","subject")])
+pheatmap(assay(ntd)[select,], cluster_rows=TRUE, show_rownames=FALSE,
+         cluster_cols=TRUE, annotation_col=df)
+```
+
+```{r}
+plotPCA(vsd, intgroup=c("condition", "subject"))
+```
+```{r}
+pcaData <- plotPCA(vsd, intgroup=c("condition", "subject"), returnData=TRUE)
+percentVar <- round(100 * attr(pcaData, "percentVar"))
+ggplot(pcaData, aes(PC1, PC2, color=condition, shape=subject)) +
+  geom_point(size=3) +
+  xlab(paste0("PC1: ",percentVar[1],"% variance")) +
+  ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
+  coord_fixed()
+```
+
+```{r}
+hist(res2$pvalue, breaks = 100)
+```
+
+```{r}
+res_table <- data.frame(res)
+res_table$gene_id <- rownames(res_table)
+```
+

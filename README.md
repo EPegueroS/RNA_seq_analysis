@@ -32,14 +32,20 @@ nextflow run nf-core/fetchngs \
   --nf_core_pipeline rnaseq
 ```
 
-# Download the genome references - will download the primary alignment from ENSEMBL GRCh38
+# Download the genome references
+Will download the primary alignment from ENSEMBL GRCh38
 
 ```bash
 bash genome_references/download_references.bash
 ```
 
-# Run the mapping - this step will fetch the nf-core/rnaseq pipeline and use it to map the reads. Using STAR.
+# Run the mapping 
+This step will fetch the nf-core/rnaseq pipeline and use it to map the reads. Using STAR.
 
 ```bash
 bash run_rnaseq.bash
 ```
+
+# DEG analysis
+
+The analysis is under the directory "DEG_analysis"

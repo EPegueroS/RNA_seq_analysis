@@ -33,13 +33,15 @@ nextflow run nf-core/fetchngs \
 ```
 
 # Download the genome references
+
 Will download the primary alignment from ENSEMBL GRCh38
 
 ```bash
 bash genome_references/download_references.bash
 ```
 
-# Run the mapping 
+# Run the mapping
+
 This step will fetch the nf-core/rnaseq pipeline and use it to map the reads. Using STAR.
 
 ```bash

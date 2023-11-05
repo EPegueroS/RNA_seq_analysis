@@ -51,3 +51,11 @@ rsconnect/
 
 # Other files
 *.swp
+.nextflow*
+inputs
+work
+out_mapping
+*.gz
+*.Rproj
+*nb.html
+

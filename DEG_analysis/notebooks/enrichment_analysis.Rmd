@@ -1,0 +1,74 @@
+---
+title: "GSEA - part 2 of the analysis"
+output: html_notebook
+---
+
+```{r}
+library(fgsea)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(ReactomePA)
+```
+
+
+```{r}
+res_table <- readRDS("../intermediate_data/res_table.Rds")
+tx_2_gene <- readRDS("../intermediate_data/tx_2_gene.Rds")
+
+res_table <- unique(merge(res_table, tx_2_gene[c(2,3)], by.x = "gene_id", by.y = "V2"))
+
+res_table <- res_table[order(-res_table$log2FoldChange), ]
+```
+
+```{r}
+id_df <- bitr(res_table$gene_id, fromType = "ENSEMBL",
+        toType = c("ENTREZID", "SYMBOL"),
+        OrgDb = org.Hs.eg.db)
+```
+
+```{r}
+res_table_extra_ids <- merge(res_table, id_df, by.x = "gene_id", by.y = "ENSEMBL", all.x = TRUE)
+
+res_table_extra_ids <- res_table_extra_ids[order(-res_table_extra_ids$log2FoldChange), ]
+```
+
+
+
+```{r}
+ego <- enrichGO(gene         = res_table$gene_id[1:50],
+                OrgDb         = org.Hs.eg.db,
+                keyType       = 'ENSEMBL',
+                ont           = "BP",
+                pAdjustMethod = "BH",
+                pvalueCutoff  = 0.05,
+                qvalueCutoff  = 0.5, universe = res_table$gene_id)
+```
+
+```{r, fig.width=12}
+barplot(ego, drop=TRUE, showCategory=10)
+```
+
+
+```{r}
+set.seed(2)
+entrez_gene_list <- res_table_extra_ids$log2FoldChange
+names(entrez_gene_list) <- res_table_extra_ids$ENTREZID
+gsea <- gsePathway(
+  entrez_gene_list,
+  pvalueCutoff = 0.05,
+  pAdjustMethod = "BH",
+  verbose = FALSE
+)
+
+head(gsea)
+```
+
+```{r}
+indx <- which(gsea$Description == "Signaling by TGF-beta Receptor Complex")
+```
+
+```{r, fig.width=12}
+enrichplot::gseaplot2(gsea, geneSetID = indx, title = gsea$Description[indx])
+```
+
+

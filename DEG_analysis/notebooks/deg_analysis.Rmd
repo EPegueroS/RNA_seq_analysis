@@ -1,5 +1,5 @@
 ---
-title: "R Notebook"
+title: "DEG calculations - part 1 of the analysis"
 output: html_notebook
 ---
 
@@ -7,6 +7,8 @@ output: html_notebook
 library(tximport)
 library(DESeq2)
 library(ggplot2)
+library(dplyr)
+library(magrittr)
 ```
 
 ```{r}
@@ -37,13 +39,13 @@ all(file.exists(sample_files))
 ```
 
 ```{r}
-tx2gene <-
+tx_2_gene <-
   read.delim(file.path(in_dir, "star_salmon" , "salmon_tx2gene.tsv"),
              header = FALSE)
 ```
 
 ```{r}
-txi <- tximport(sample_files, type = "salmon", tx2gene = tx2gene)
+txi <- tximport(sample_files, type = "salmon", tx2gene = tx_2_gene)
 names(txi)
 ```
 
@@ -58,44 +60,61 @@ sample_table <-
     subject = factor(stringr::str_split_i(colnames(txi$counts), "_", 3))
   )
 rownames(sample_table) <- colnames(txi$counts)
-sample_table
+sample_table$condition <- factor(ifelse(sample_table$condition == "G02", "Control", "Treated"))
+
+sample_table %>% arrange(condition, subject)
 ```
+
+
 ```{r}
 dds <- DESeqDataSetFromTximport(txi, sample_table, ~subject + condition)
-smallestGroupSize <- 3
-keep <- rowSums(counts(dds) >= 10) >= smallestGroupSize
+## Keeping genes that have at least 10 reads in 3 or more samples
+keep <- rowSums(counts(dds) >= 10) >= 3
 dds <- dds[keep,]
 
 dds <- DESeq(dds)
 resultsNames(dds) # lists the coefficients
 res <- results(dds)
+res <- results(dds, name="condition_Treated_vs_Control")
 res
-res <- results(dds, name="condition_G03_vs_G02")
-res
+
 ```
 
 ```{r}
 resultsNames(dds)
+```
 
+
+```{r, fig.width = 12}
+ds2data <- as.data.frame(results(dds, cooksCutoff = FALSE))
+
+ds2data$padj <- ifelse(is.na(ds2data$padj), 1, ds2data$padj)
+
+ggplot(data = ds2data) +
+  geom_point(
+    aes(x = baseMean, y = log2FoldChange),
+    size = 1.25,
+    color = ifelse(ds2data$padj < 0.05, "red", "black"),
+    alpha = 0.5
+  ) +
+  scale_x_log10() + ylim(c(-10,10)) + theme_dark()
+```
+
+
+```{r}
+plotMA(dds, ylim=c(-8,8))
 ```
 
 ```{r}
-resLFC <- lfcShrink(dds, coef="condition_G03_vs_G02", type="apeglm")
-resLFC
+plotCounts(dds, gene="ENSG00000049768", intgroup="condition", normalized = FALSE)
 ```
 
 ```{r}
-plotMA(res, ylim=c(-2,2))
-```
-```{r}
-plotMA(resLFC, ylim=c(-2,2))
-
+plotCounts(dds, gene="ENSG00000049768", intgroup="condition", normalized = TRUE)
 ```
 
 
-```{r}
-plotCounts(dds, gene="ENSG00000049768", intgroup="condition")
-```
+
 
 ```{r}
 # this gives log2(n + 1)
@@ -114,46 +133,41 @@ head(assay(vsd), 3)
 
 ```{r}
 meanSdPlot(assay(vsd))
-
 ```
 
 ```{r}
-# this gives log2(n + 1)
-ntd <- normTransform(dds)
-library("vsn")
-meanSdPlot(assay(ntd))
+meanSdPlot(assay(rld))
 ```
 
-
-
-```{r}
+```{r, fig.width=12}
 library("pheatmap")
-select <- order(rowMeans(counts(dds,normalized=TRUE)),
-                decreasing=TRUE)[1:150]
+select <- order(rowMeans(counts(dds, normalized=TRUE)),
+                decreasing=TRUE)[1:1000]
 df <- as.data.frame(colData(dds)[,c("condition","subject")])
 pheatmap(assay(ntd)[select,], cluster_rows=TRUE, show_rownames=FALSE,
          cluster_cols=TRUE, annotation_col=df)
 ```
 
-```{r}
-plotPCA(vsd, intgroup=c("condition", "subject"))
+```{r, fig.width=12}
+pheatmap(assay(vsd)[select,], cluster_rows=TRUE, show_rownames=FALSE, 
+         cluster_cols=TRUE, annotation_col=df)
 ```
-```{r}
+
+```{r, fig.width=12}
 pcaData <- plotPCA(vsd, intgroup=c("condition", "subject"), returnData=TRUE)
 percentVar <- round(100 * attr(pcaData, "percentVar"))
 ggplot(pcaData, aes(PC1, PC2, color=condition, shape=subject)) +
   geom_point(size=3) +
   xlab(paste0("PC1: ",percentVar[1],"% variance")) +
   ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
-  coord_fixed()
-```
-
-```{r}
-hist(res2$pvalue, breaks = 100)
+  coord_fixed() + theme_dark()
 ```
 
 ```{r}
 res_table <- data.frame(res)
 res_table$gene_id <- rownames(res_table)
+saveRDS(res_table, "../intermediate_data/res_table.Rds")
+
+saveRDS(tx_2_gene, "../intermediate_data/tx_2_gene.Rds")
 ```
 
